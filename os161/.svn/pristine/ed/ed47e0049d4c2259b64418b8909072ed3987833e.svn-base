@@ -1,0 +1,13 @@
+//test 2
+#include <coremap.h>
+
+void
+inititializeCoremap(){
+	int i;
+	for(i = 0; i < totalCoremapEntries; i++){
+		coremap[i].ppn = -1;//initialize to smth invalid
+		coremap[i].empty = 0;
+		coremap[i].modified = 0;
+		coremap[i].addrspace = NULL;
+	} 
+}

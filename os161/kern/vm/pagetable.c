@@ -1,0 +1,271 @@
+//pagetable.c
+
+#include <pagetable.h>
+#include <types.h>
+#include <vm.h>
+#include <coremap.h>
+#include <lib.h>
+#include <thread.h>
+#include <curthread.h>
+#include <kern/errno.h>
+
+
+// create a single page in page table 
+page* 
+page_create(unsigned int faultaddr, int npages){
+
+	// get the page table
+	pagetable table = curthread->t_vmspace->as_pagetable;
+	page* newpage;
+
+	// allocate the new page
+	newpage = kmalloc(sizeof(struct page));
+	if (newpage == NULL){
+		return NULL;
+	}
+
+	newpage->vaddr = faultaddr;
+	// only need to set vpagenum and next = NULL when it is a brand new linked list entry
+	// newpage->vpagenum = find_next_pagetable_index();
+	newpage->next = NULL;
+	
+	newpage->paddr = getppages(npages);
+	
+	if (newpage->paddr == 0){
+		return(NULL);
+	}
+
+	// get a ppagenum 
+	newpage->ppagenum = PADDR_TO_COREMAP(newpage->paddr);
+
+	// when a page gets created, it must be valid - 
+	// newpage->valid = 1;
+
+	// ensure linked list functionality - set the next pointer of previous page to new page
+	// if no table exists, link the first page
+	// if(newpage->vpagenum > 0 ){	
+	// 	table[newpage->vpagenum - 1].next = newpage;
+	// }
+	// else if(table == NULL) {
+	// 	curthread->t_vmspace->as_pagetable = newpage;
+	// }
+
+	if(table == NULL){
+		curthread->t_vmspace->as_pagetable = newpage;
+	}
+	else{
+
+		// page* temp;
+
+		// temp = table;
+
+		while(table->next!=NULL){
+			table = table->next;
+		}
+
+		table->next = newpage;
+
+	}
+
+	assert(page_in_pagetable(faultaddr));
+	// return
+	return (newpage);
+}
+
+// find the next available index in the list
+/*int
+find_next_pagetable_index(){
+	
+	// get the page table
+	pagetable table = curthread->t_vmspace->as_pagetable;
+
+	int num;
+	int i = 0;
+
+	if(table == NULL){
+		// this is the first page 
+		num = 0;
+	}
+	else{
+		// cycle through to get the first available index
+		while(1){
+			if(table[i].next == NULL){
+				num = i+1;
+				break;
+			}
+			else{
+				i++;
+			}
+		}
+	}
+
+	return num;
+}*/
+
+page* 
+find_page(unsigned int vaddr){
+
+	pagetable table = curthread->t_vmspace->as_pagetable;
+
+	// shouldn't call this on an empty page table or with a bad vaddr
+	assert(vaddr!=0);
+	assert(table!=NULL);
+
+	// cycle through and find your page
+	while (table->vaddr != vaddr){
+		table = table->next;
+	}
+
+	return (table);
+
+}
+
+// destroy a single page in page table
+// should only happened on as_destroy calls => we can assume that we are always destroying the last page 
+void 
+page_destroy(page* victim){
+	/* TO BE IMPLEMENTED*/
+
+	// unlike an actual linked list, we don't have to account for all the cases and connectivity problems
+	assert(coremap[victim->ppagenum].used == 1);
+	// first mark the corresponding physical page as free 
+	// coremap[victim->ppagenum].used--;
+	invalidate_page(victim);
+
+	/*NO COPY ON WRITE => MAKE SURE COREMAP ENTRY IS USED BY NOBODY*/
+	assert(coremap[victim->ppagenum].used == 0);
+
+
+
+	// // break the victim out of the linked list
+	
+
+
+
+	// if(victim == curthread->t_vmspace->as_pagetable){
+	// 	// this is the head of linked list 
+	// 	curthread->t_vmspace->as_pagetable = victim->next;
+	// }
+	// else{
+
+	// pagetable table = curthread->t_vmspace->as_pagetable;	
+
+	// page* prev = &table[victim->vpagenum - 1];
+	// prev->next = victim->next;
+	// }
+
+	victim->next = NULL;
+
+	// set all the elements to zero, free the page
+	victim->vaddr = 0;
+	// victim->vpagenum = 0;
+	victim->paddr = 0;
+	victim->ppagenum = 0;
+	kfree(victim);
+	victim = NULL;
+}
+
+void 
+pagetable_destroy(page* table){
+
+	// repeatedly destroy the head
+	page* temp;
+
+	while (table != NULL){
+		temp = table;
+		table = table->next;
+		page_destroy(temp);
+	}
+
+}
+
+void 
+invalidate_page(page* invalid){
+	coremap_free(invalid->paddr);
+
+	// coremap[invalid->ppagenum].used--;
+
+	// kprintf("deallocated this address: %x\n", coremap[invalid->ppagenum].paddr);
+
+	// coremapEntriesFree++;
+}
+
+
+
+int 
+page_in_pagetable(unsigned int vaddr){
+
+	// vaddr &= PAGE_SIZE;//page align
+	
+	assert(curthread->t_vmspace != NULL);
+	pagetable pt = (curthread->t_vmspace)->as_pagetable;
+
+	while(pt != NULL){
+		if(pt->vaddr == vaddr){
+			return(1);
+		}
+		pt = pt->next;
+	}
+	return(0);
+}
+
+pagetable
+copy_pagetable(pagetable old){
+
+	page* new;
+	pagetable head; 
+	page* prev;
+	int counter = 0;
+
+	while(old != NULL){
+
+		new = kmalloc(sizeof(struct page));
+
+		if (new == NULL){
+			// kprintf("page not enough mem\n");
+			return NULL;
+		}
+
+		new->vaddr = old->vaddr; 
+		
+		new->paddr = getppages(1);/*(unsigned int)kmalloc(sizeof(char) * PAGE_SIZE)*/;
+		
+		if (new->paddr == 0){
+			// kprintf("coudln't getppages\n");
+			return(NULL);
+		}
+
+		// kprintf("got phys page\n");
+
+		// get a ppagenum 
+		new->ppagenum = PADDR_TO_COREMAP(new->paddr);
+
+		new->next = NULL;
+		// kprintf("going to memmove\n");
+		// deep copy the actual memory
+
+		// kprintf("old vaddr = 0%x\n", (unsigned int )PADDR_TO_KVADDR(old->paddr));
+		// kprintf("new vaddr = 0%x\n", (unsigned int )PADDR_TO_KVADDR(new->paddr));
+		// kprintf("old paddr = 0x%x\n", old->paddr);
+		// kprintf("new paddr = 0x%x\n", new->paddr);
+
+		memmove((void*)PADDR_TO_KVADDR(new->paddr), (void*)PADDR_TO_KVADDR(old->paddr), PAGE_SIZE);
+		if (counter == 0){
+			// kprintf("%d\n", counter);
+			head = new;
+		}
+		else {
+			prev->next = new;
+			// kprintf("%d\n", counter);
+		}		
+		
+		prev = new; 
+
+		old = old->next;
+
+		counter++;
+	}
+	// kprintf("going to return\n");
+	assert(head != NULL);
+	return (head);
+}

@@ -1,0 +1,42 @@
+#ifndef _PAGETABLE_H_
+#define _PAGETABLE_H_
+//pagetable.h
+
+#include <array.h>
+
+enum {
+	R,
+	W,
+	E,
+	RW,
+	RE,
+	WE,
+	RWE
+};
+
+// #include <../arch/mips/include/ktypes.h>
+
+//page tables map virtual addresses(addresses that cpu thinks it's addressing)
+//to locations in main memory if they exist
+
+typedef struct page{
+
+	// 
+	int pageNum;//page frame number in mmu
+	unsigned int vaddr;//the base of virtual addresses that match this page
+	unsigned int paddr;
+
+	int read;
+	int write;
+	int exec;
+
+} page;
+
+typedef struct page* pagetable;
+
+// typedef struct+ array page_table;
+
+// page_table* init_page_table();
+
+
+#endif /* _PAGETABLE_H_ */

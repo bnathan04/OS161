@@ -1,0 +1,145 @@
+//pagetable.c
+
+#include <pagetable.h>
+#include <types.h>
+#include <vm.h>
+#include <coremap.h>
+#include <lib.h>
+#include <thread.h>
+#include <curthread.h>
+#include <kern/errno.h>
+
+
+// create a single page in page table 
+page* 
+page_create(unsigned int faultaddr, int npages){
+
+	// get the page table
+	pagetable table = curthread->t_vmspace->as_pagetable;
+
+	// allocate the new page
+	page* newpage = kmalloc(sizeof(struct page));
+	if (newpage == NULL){
+		return NULL;
+	}
+
+	// set up all the elements
+	newpage->vaddr = faultaddr;
+	newpage->vpagenum = find_next_pagetable_index();
+	newpage->paddr = getppages(npages);
+	newpage->ppagenum = PADDR_TO_COREMAP(newpage->paddr);
+	newpage->next = NULL;
+
+	// ensure linked list functionality - set the next pointer of previous page to new page
+	if(newpage->vpagenum > 0 ){	
+		table[newpage->vpagenum - 1].next = newpage;
+	}
+
+	// return
+	return (newpage);
+}
+
+// find the next available index in the list
+int
+find_next_pagetable_index(){
+	
+	// get the page table
+	pagetable table = curthread->t_vmspace->as_pagetable;
+
+	int num;
+	int i = 0;
+
+	if(table == NULL){
+		// this is the first page 
+		num = 0;
+	}
+	else{
+		// cycle through to get the first available index
+		while(1){
+			if(table[i].next == NULL){
+				num = i+1;
+				break;
+			}
+			else{
+				i++;
+			}
+		}
+	}
+
+	return num;
+}
+
+page* 
+find_page(unsigned int vaddr){
+
+	int i = 0;
+	pagetable table = curthread->t_vmspace->as_pagetable;
+
+	// shouldn't call this on an empty page table or with a bad vaddr
+	assert(vaddr!=0);
+	assert(table!=NULL);
+
+	// cycle through and find your page
+	while (table[i].vaddr != vaddr){
+		i++;
+	}
+
+	return (&table[i]);
+
+}
+
+// destroy a single page in page table
+void 
+page_destroy(page* victim){
+	/* TO BE IMPLEMENTED*/
+
+	// break the victim out of the linked list
+	
+	if(victim == curthread->t_vmspace->as_pagetable){
+		// this is the head of linked list 
+		curthread->t_vmspace->as_pagetable = victim->next;
+	}
+	else{
+
+	pagetable table = curthread->t_vmspace->as_pagetable;	
+
+	page* prev = &table[victim->vpagenum - 1];
+	prev->next = victim->next;
+	}
+
+	victim->next = NULL;
+
+	// set all the elements to zero, free the page
+	victim->vaddr = 0;
+	victim->vpagenum = 0;
+	victim->paddr = 0;
+	victim->ppagenum = 0;
+	kfree(victim);
+	victim = NULL;
+}
+
+void 
+pagetable_destroy(){
+
+	// repeatedly destroy the head
+	while (curthread->t_vmspace->as_pagetable != NULL){
+		page_destroy(curthread->t_vmspace->as_pagetable);
+	}
+}
+
+
+
+int 
+page_in_pagetable(unsigned int vaddr){
+
+	vaddr &= PAGE_SIZE;//page align
+	pagetable pt = (curthread->t_vmspace)->as_pagetable;
+
+	while(pt != NULL){
+		if(pt->vaddr == vaddr){
+			return(1);
+		}
+		pt = pt->next;
+	}
+	return(0);
+}

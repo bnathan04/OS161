@@ -1,0 +1,11 @@
+echo "going to make"
+cd ~/ece344/os161/kern
+cd conf/
+./config ASST2
+cd ../compile/ASST2
+make depend
+make
+make install
+#cd ~/ece344/os161
+#make clean
+cd ~/ece344/root

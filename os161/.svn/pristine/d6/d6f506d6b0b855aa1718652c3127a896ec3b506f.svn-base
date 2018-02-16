@@ -1,0 +1,438 @@
+/* All the includes from dumbvm are also included here*/
+#include <types.h>
+#include <kern/errno.h>
+#include <lib.h>
+#include <thread.h>
+#include <curthread.h>
+#include <addrspace.h>
+#include <vm.h>
+#include <machine/spl.h>
+#include <machine/tlb.h>
+
+// include the coremap stuff
+#include <coremap.h>
+
+#include <pagetable.h>
+
+/* under dumbvm, always have 48k of user stack */
+#define DUMBVM_STACKPAGES    12
+#define STACK_BOTTOM 500*PAGE_SIZE
+
+int faults;
+
+/* Space to implement our vm functions */
+
+void 
+vm_bootstrap(){
+	
+	init_coremap();
+	faults = 0;
+
+} 
+
+
+paddr_t
+getppages(unsigned long npages)
+{
+	// kprintf("IN GETPPAGES\n");
+
+	int spl;
+	paddr_t addr;
+
+	spl = splhigh();
+
+	addr = find_pages_in_core_map(npages);
+	
+	splx(spl);
+
+	return addr;
+}
+
+/* Allocate/free some kernel-space virtual pages */
+vaddr_t 
+alloc_kpages(int npages)
+{
+	paddr_t pa;
+	pa = getppages(npages);
+	if (pa==0) {
+		return 0;
+	}
+	return PADDR_TO_KVADDR(pa);
+}
+
+void 
+free_kpages(vaddr_t addr)
+{
+	int spl = splhigh();
+	coremap_free(KVADDR_TO_PADDR(addr));
+	splx(spl);
+
+}
+
+//writing this incase we change how we exit a thread that faulted
+void
+fault_exit_thread(){
+	thread_exit();
+}
+
+int
+invalid_fault_region(vaddr_t faultAddress, vaddr_t bot1, 
+					vaddr_t top1, vaddr_t bot2, vaddr_t top2, 
+					vaddr_t heapBot, vaddr_t stackTop){
+	
+	//good region
+	if(
+	(faultAddress >= bot1 && faultAddress < top1) ||
+	(faultAddress >= bot2 && faultAddress < top2) ||
+	(faultAddress >= heapBot && faultAddress < stackTop)
+	)return(0);
+		
+	//baddog.jpeg
+	return(1);	
+}
+
+int
+vm_fault(int faulttype, vaddr_t faultaddress)
+{
+	vaddr_t vbase1, vtop1, vbase2, vtop2, stackbase, stacktop, heapbase, heaptop;
+	paddr_t paddr;
+	int i;
+	u_int32_t ehi, elo;
+	struct addrspace *as;
+	int spl;
+
+	spl = splhigh();
+
+	faultaddress &= PAGE_FRAME;
+
+	DEBUG(DB_VM, "dumbvm: fault: 0x%x\n", faultaddress);
+
+	switch (faulttype) {
+	    case VM_FAULT_READONLY:
+		/* We always create pages read-write, so we can't get this */
+		panic("dumbvm: got VM_FAULT_READONLY\n");
+	    case VM_FAULT_READ:
+	    case VM_FAULT_WRITE:
+		break;
+	    default:
+		splx(spl);
+		return EINVAL;
+	}
+
+	as = curthread->t_vmspace;
+	if (as == NULL) {
+		/*
+		 * No address space set up. This is probably a kernel
+		 * fault early in boot. Return EFAULT so as to panic
+		 * instead of getting into an infinite faulting loop.
+		 */
+		return EFAULT;
+	}
+
+	/* Assert that the address space has been set up properly. */
+	// assert(as->as_vbase1 != 0);
+	// assert(as->as_pbase1 != 0);
+	// assert(as->as_npages1 != 0);
+	// assert(as->as_vbase2 != 0);
+	// assert(as->as_pbase2 != 0);
+	// assert(as->as_npages2 != 0);
+	// assert(as->as_stackpbase != 0);
+	// assert((as->as_vbase1 & PAGE_FRAME) == as->as_vbase1);
+	// assert((as->as_pbase1 & PAGE_FRAME) == as->as_pbase1);
+	// assert((as->as_vbase2 & PAGE_FRAME) == as->as_vbase2);
+	// assert((as->as_pbase2 & PAGE_FRAME) == as->as_pbase2);
+	// assert((as->as_stackpbase & PAGE_FRAME) == as->as_stackpbase);
+
+	vbase1 = as->as_vbase1;
+	vtop1 = vbase1 + as->as_npages1 * PAGE_SIZE;
+	vbase2 = as->as_vbase2;
+	vtop2 = vbase2 + as->as_npages2 * PAGE_SIZE;
+	stackbase = as->as_stackvbase;/*USERSTACK - DUMBVM_STACKPAGES * PAGE_SIZE*/;
+	stacktop = USERSTACK;
+	heapbase = as->as_heapvbase;
+	heaptop = as->as_heapvtop;
+
+
+
+	int validNewPage = 1;
+
+	if (faultaddress >= vbase1 && faultaddress < vtop1) {
+		paddr = (faultaddress - vbase1) + as->as_pbase1;
+	}
+	else if (faultaddress >= vbase2 && faultaddress < vtop2) {
+		paddr = (faultaddress - vbase2) + as->as_pbase2;
+		
+	}
+	else if (faultaddress >= stackbase && faultaddress < stacktop) {
+		paddr = (faultaddress - stackbase) + as->as_stackpbase;
+		validNewPage = 0;
+	}
+	else if (faultaddress < stackbase && faultaddress >= (stackbase - STACK_BOTTOM)){
+		// kprintf("moving the stack!!\n");
+		size_t newStackPages = stackbase - faultaddress;
+		assert((newStackPages & PAGE_FRAME)== newStackPages);
+		newStackPages = newStackPages/PAGE_SIZE;
+		assert(newStackPages <= 500);
+		as->as_stackvbase = faultaddress;
+	}
+	else if (faultaddress >= heapbase && faultaddress < heaptop){
+		validNewPage = 0;
+	}
+	else {
+		splx(spl);
+		return EFAULT;
+	}
+
+
+	page* newEntry;
+
+	//page associated with tlb entry that caused fault
+	// may not exist. check
+	if(page_in_pagetable(faultaddress)){
+		
+		newEntry = find_page(faultaddress);
+
+		assert(coremap[newEntry->ppagenum].used == 1);
+
+		// page_create(faultaddress,1);
+	}
+	else{
+
+		// assert(validNewPage);
+
+		newEntry = page_create(faultaddress,1);
+
+	}
+
+	if (newEntry == NULL){
+		return EFAULT;
+	}
+
+	paddr = newEntry->paddr;
+
+	/* make sure it's page-aligned */
+	assert((paddr & PAGE_FRAME)==paddr);
+	assert(page_in_pagetable(faultaddress));
+
+
+	// kprintf("Writing to TLB\n");
+
+	for (i=0; i<NUM_TLB; i++) {
+		TLB_Read(&ehi, &elo, i);
+		if (elo & TLBLO_VALID) {
+			continue;
+		}
+		ehi = faultaddress;
+		elo = paddr | TLBLO_DIRTY | TLBLO_VALID;
+		DEBUG(DB_VM, "dumbvm: 0x%x -> 0x%x\n", faultaddress, paddr);
+		TLB_Write(ehi, elo, i);
+		splx(spl);
+		return 0;
+	}
+
+	kprintf("dumbvm: Ran out of TLB entries - cannot handle page fault\n");
+	splx(spl);
+	return EFAULT;
+}
+
+
+/* LEFT FOR SAHAN DELETE IF NOT NEEDED ANYMORE (code below)*/
+
+
+// deal with fault. if it's allowed fix problem. else exit thread
+// int
+// vm_fault(int faulttype, vaddr_t faultaddress)
+// {
+	
+// 	faults++;
+
+// 	// kprintf("We have had %d faults. Currently faultin at address: %x\n", faults, faultaddress);
+
+// 	vaddr_t vbase1, vtop1, vbase2, vtop2,heapBase, stackTop;
+	
+// 	// vaddr_t stackvbase /* We now have to track this*/
+
+// 	paddr_t paddr;
+// 	int i;
+// 	u_int32_t ehi, elo;
+// 	struct addrspace *as;
+// 	int spl;
+// 	// int result;
+
+// 	spl = splhigh();
+
+// 	faultaddress &= PAGE_FRAME;
+
+// 	DEBUG(DB_VM, "dumbvm: fault: 0x%x\n", faultaddress);
+
+// 	/* WE DONT CARE ABOUT THIS SWITCH CASE WE DONT TRACK PERMISSIONS*/
+// 	switch (faulttype) {
+// 	    case VM_FAULT_READONLY:
+// 			//from dumbvm
+// 			/* We always create pages read-write, 
+// 			so we can't get this */
+// 			// panic("dumbvm: got VM_FAULT_READONLY\n");
+
+// 	    	//if a read fault happened, something bad happened.
+// 	    	//just exit
+// 	    	//fault_exit_thread();
+// 	    case VM_FAULT_READ:
+// 	    	//should i fault_exit_thread here too????
+// 	    	//break;
+// 	    case VM_FAULT_WRITE:
+// 			break;
+// 	    default:
+// 			splx(spl);
+// 			return EINVAL;
+// 	}
+
+// 	as = curthread->t_vmspace;
+// 	if (as == NULL) {
+// 		/*
+// 		 * No address space set up. This is probably a kernel
+// 		 * fault early in boot. Return EFAULT so as to panic
+// 		 * instead of getting into an infinite faulting loop.
+// 		 */
+// 		return EFAULT;
+// 	}
+
+// 	//Assert that the address space has been set up properly.
+// 	assert(as->as_vbase1 != 0);
+// 	assert(as->as_pbase1 != 0);
+// 	assert(as->as_npages1 != 0);
+// 	assert(as->as_vbase2 != 0);
+// 	assert(as->as_pbase2 != 0);
+// 	assert(as->as_npages2 != 0);
+// 	assert(as->as_stackpbase != 0);
+// 	// assert(as->as_heappbase != 0);this fails
+// 	assert((as->as_vbase1 & PAGE_FRAME) == as->as_vbase1);
+// 	assert((as->as_pbase1 & PAGE_FRAME) == as->as_pbase1);
+// 	assert((as->as_vbase2 & PAGE_FRAME) == as->as_vbase2);
+// 	assert((as->as_pbase2 & PAGE_FRAME) == as->as_pbase2);
+// 	assert((as->as_stackpbase & PAGE_FRAME) == as->as_stackpbase);
+// 	//	assert((as->as_heappbase & PAGE_FRAME) == as->as_heappbase);
+	
+// 	//check if fault happened outside it's virtual address range
+
+// 	//-       - <-- bad fault address
+// 	//-       -
+// 	//---------stackTop
+// 	//- stack -just using dumbvm stack rn
+// 	//-   /   - <-- acceptable fault address. d
+// 	//- heap  - not distinugishing between heap and stack rn
+// 	//---------heapBase/vtop2
+// 	//-       -
+// 	//-  data - <-- acceptable fault address
+// 	//-       -
+// 	//---------vbot2/vtop1
+// 	//-       -
+// 	//- instr - <-- acceptable fault address
+// 	//-       -
+// 	//---------vbot1
+// 	//-       -
+// 	//-       - <-- bad fault address
+
+// 	vbase1 = as->as_vbase1;
+// 	vtop1 = as->as_vbase1 + as->as_npages1 * PAGE_SIZE;
+
+// 	vbase2 = as->as_vbase2;
+// 	vtop2 = as->as_vbase2 + as->as_npages2 * PAGE_SIZE;
+
+// 	///////
+
+// 	/*stack top stays the same for us, but stack base cannot be static should be tracked in addrspace struct*/
+// 	vaddr_t stackbase, stacktop;
+// 	stackbase = USERSTACK - DUMBVM_STACKPAGES * PAGE_SIZE;
+// 	stacktop = USERSTACK;
+
+// 	page* newEntry;
+
+// 	// //page associated with tlb entry that caused fault
+// 	// // may not exist. check
+// 	// if(page_in_pagetable(faultaddress)){
+		
+// 	// 	newEntry = find_page(faultaddress);
+
+// 	// 	assert(coremap[newEntry->ppagenum].used == 1);
+
+// 	// 	// page_create(faultaddress,1);
+// 	// }
+// 	// else{
+
+// 	// 	newEntry = page_create(faultaddress,1);
+
+// 	// }
+
+// 	// paddr = newEntry->paddr;
+
+// 	// // heapBase = as->as_heapvbase;//consider heap/stack as 1 region
+// 	// // stackTop = USERSTACK;//top of virtual stack same all around
+
+// 	if (faultaddress >= vbase1 && faultaddress < vtop1) {
+// 	 	paddr = (faultaddress - vbase1) + as->as_pbase1;
+// 	}
+// 	else if(faultaddress >= vbase2 && faultaddress < vtop2) {
+// 		paddr = (faultaddress - vbase2) + as->as_pbase2;
+// 	}
+
+// 	/* MODIFY THIS WHEN OUR STACK PTR IS IMPLEMENTED */
+// 	else if (faultaddress >= stackbase && faultaddress < stacktop) {
+// 		paddr = (faultaddress - stackbase) + as->as_stackpbase;
+// 	}
+// 	// else if(faultaddress >= heapBase && faultaddress < stackTop) {
+// 	// 	//issue here? i made a slight edit to dumbvm code
+// 	// 	//they knew where the bottom of stack was because it was
+// 	// 	//fixed. i don't so i use the base of heap
+// 	// 	paddr = (faultaddress - heapBase) + as->as_heappbase;
+	
+// 	//issues. heappbase not set ever
+
+// 	// }
+// 	else{
+// 		splx(spl);
+// 		return EFAULT;
+// 	}
+	
+// 	// make sure it's page-aligned 
+// 	paddr &= PAGE_FRAME;
+// 	assert((paddr & PAGE_FRAME)==paddr);
+	
+	
+
+
+
+// 	//fault occured because tlb didn't have entry.
+// 	//write tlb entry in	
+
+// 	kprintf("writing to TLB - faultaddress: 0x%x, phy address: 0x%x, pid: %d, ppagenum: %d\n", faultaddress, paddr, curthread->pid, PADDR_TO_COREMAP(newEntry->paddr));
+// 	kprintf("from the core map[%d] - phy address: 0x%x\n", (newEntry->ppagenum), coremap[newEntry->ppagenum].paddr);
+
+
+
+
+
+// 	//look for a free tlb entry
+// 	for (i=0; i<NUM_TLB; i++) {
+// 		TLB_Read(&ehi, &elo, i);
+// 		if (elo & TLBLO_VALID) {
+// 			continue;
+// 		}
+// 		// ehi = faultaddress;
+// 		ehi = newEntry->vaddr;
+// 		// make sure the vaddr is the fault addr
+// 		assert(ehi == faultaddress);
+// 		elo = paddr | TLBLO_DIRTY | TLBLO_VALID;
+// 		// elo = paddr | TLBLO_DIRTY | TLBLO_VALID;
+// 		DEBUG(DB_VM, "dumbvm: 0x%x -> 0x%x\n", faultaddress, paddr);
+// 		TLB_Write(ehi, elo, i);
+// 		splx(spl);
+// 		return 0;	
+// 	}	
+	
+// 	//no entires free => choose randomly
+// 	TLB_Random(ehi, elo);
+	
+// 	splx(spl);
+// 	return(0);
+
+// }

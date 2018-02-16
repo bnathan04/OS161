@@ -1,0 +1,51 @@
+//pagetable.c
+
+#include <pagetable.h>
+#include <types.h>
+#include <vm.h>
+#include <coremap.h>
+#include <lib.h>
+#include <thread.h>
+#include <curthread.h>
+
+
+
+page* 
+page_create(int num, unsigned int faultaddr, int npages, struct page* prev){
+
+	// alloc the page
+	// alloc the page and set its elements
+	page* newpage = kmalloc(sizeof(struct page));
+	newpage->vaddr = faultaddr;
+	newpage->vpagenum = num;
+	newpage->paddr = getppages(npages);
+	newpage->ppagenum = PADDR_TO_COREMAP(newpage->paddr);
+
+	// ensure linked list functionality - set the next pointer of previous page to new page
+	prev->next = newpage;
+
+	// return
+	return (newpage);
+}
+
+
+page* 
+page_destroy(){
+	/* TO BE IMPLEMENTED*/
+	return(NULL);
+}
+
+int 
+page_in_pagetable(unsigned int vaddr){
+
+	vaddr &= PAGE_SIZE;//page align
+	pagetable pt = (curthread->t_vmspace)->as_pagetable;
+
+	while(pt != NULL){
+		if(pt->vaddr == vaddr){
+			return(1);
+		}
+		pt = pt->next;
+	}
+	return(0);
+}

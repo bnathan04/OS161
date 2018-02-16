@@ -1,0 +1,40 @@
+#ifndef _SYSCALLFUNC_H_
+#define _SYSCALLFUNC_H_
+
+#include <../../arch/mips/include/types.h>
+#include <types.h>
+#include <machine/trapframe.h>
+#include <synch.h>
+
+#define NO_OPTIONS 0
+
+struct semaphore;
+
+struct thread;
+
+
+struct cv;
+
+
+struct lock;
+
+extern struct lock* programLock;
+
+extern struct lock* forkLock; 
+
+int sys_write(int fd, const void* buf, size_t nbytes, int32_t *retVal);
+int sys_read(int fd, void* buf, size_t buflen, int32_t *retVal);
+int sys_fork(struct trapframe *tf, int32_t *retVal);
+void sys_getpid(int32_t *retVal);
+pid_t sys_waitpid(pid_t pid, int *status, int options, int* retVal, const int* fromUser);
+void sys_exit(int exitCode);
+int sys_execv(char* program, char** args);
+int sys_time(time_t* seconds, unsigned long* nseconds, int* retVal);
+
+int sys_chdir(const char *pathname);
+
+// int process_create(const char* name, void* tf, unsigned long addr, void (*func)(void*, unsigned long), int32_t *retVal);
+
+#endif /* _SYSCALLFUNC_H_ */
+
+

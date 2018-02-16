@@ -1,0 +1,254 @@
+/*
+ * Sample/test code for running a user program.  You can use this for
+ * reference when implementing the execv() system call. Remember though
+ * that execv() needs to do more than this function does.
+ */
+
+#include <types.h>
+#include <kern/unistd.h>
+#include <kern/errno.h>
+#include <lib.h>
+#include <addrspace.h>
+#include <thread.h>
+#include <curthread.h>
+#include <vm.h>
+#include <vfs.h>
+#include <test.h>
+
+// syscall synch
+
+#include <kern/syscall_func.h> 
+
+
+
+/*
+ * Load program "progname" and start running it in usermode.
+ * Does not return except on error.
+ *
+ * Calls vfs_open on progname and thus may destroy it.
+ */
+int
+runprogram(char *progname, unsigned long argc, char**argv, int kernelCall, vaddr_t stackptr)
+{
+
+
+
+	struct vnode *v;
+	vaddr_t entrypoint;
+	int result;
+
+	// new address variable , so runprogram can return properly if there is an error with a usercall
+	struct addrspace* tempAddr = kmalloc(sizeof(struct addrspace));
+
+	/* Open the file. */
+	result = vfs_open(progname, O_RDONLY, &v);
+	if (result) {
+		return result;
+	}
+
+	/* 
+	 * We should be a new thread. If not, create new address space anyways, but store the old one in case 
+	 * we hit an error and need to go back		
+	 */
+
+	if(curthread->t_vmspace != NULL){
+		*tempAddr = *(curthread->t_vmspace);
+		as_destroy(curthread->t_vmspace);
+	}
+
+	/* Create a new address space. */
+	curthread->t_vmspace = as_create();
+	if (curthread->t_vmspace==NULL) {
+		vfs_close(v);
+		return ENOMEM;
+	}
+
+	/* Activate it. */
+	as_activate(curthread->t_vmspace);	
+
+	/* Load the executable. */
+	result = load_elf(v, &entrypoint);
+
+	if (result) {
+		/* thread_exit destroys curthread->t_vmspace */
+		as_destroy(curthread->t_vmspace);
+		curthread->t_vmspace = kmalloc(sizeof(struct addrspace));
+		*(curthread->t_vmspace) = *tempAddr;
+		kfree(tempAddr);
+		vfs_close(v);
+		return result;
+	}
+
+	/* Done with the file now. */
+	vfs_close(v);
+
+
+	/* Define the user stack in the address space */
+	result = as_define_stack(curthread->t_vmspace, &stackptr);
+	if (result) {
+		/* thread_exit destroys curthread->t_vmspace */
+		return result;
+	}
+
+
+
+	// put the user argument on the stack with proper alignment and such;
+
+	int i;
+	int argWordLength;
+
+	for(i = argc - 1; i>= 0; i--){
+	
+		argWordLength = how_many_words(argv[i]);
+
+		stackptr -= argWordLength * WORD_SIZE;
+		result = copyoutstr(argv[i], (userptr_t)stackptr, strlen(argv[i]) + 1, NULL);
+		if(result){
+			//kfree
+			return(result);
+		}
+		//we need to move (the pointer of the argument on the stack) onto the stack
+		//because the user program needs pointers to the args.
+		// => track their location to move later
+		argv[i] = (char*) stackptr;	
+	}
+
+	//double check that the ptrs will be word aligned
+	// stackptr = stackptr - ((stackptr) % 4);
+
+	//cant use copy out because it checks if the character == 0(null char) to finish. arnold is 4 bytes of 0
+	//pointers to args are terminated by 4 bytes of nothing
+	vaddr_t* arnoldSchwarzenegger;//comedy gold	
+	stackptr -= 4;
+
+	//stackPtr is actaully an int with location of stack not a ptr to location of stack
+	arnoldSchwarzenegger = stackptr;
+	*arnoldSchwarzenegger = 0x0;//terminate.heheheheh
+
+	//move the pointers onto the stack
+	for(i = argc - 1; i >= 0; i --)
+	{
+		stackptr = stackptr - 4;	
+		result = copyout(&argv[i], stackptr, sizeof(vaddr_t));
+		if (result){
+			return result;	
+		} 
+	}
+
+	/* Warp to user mode. */
+	md_usermode(argc, stackptr, stackptr, entrypoint);
+	
+	/* md_usermode does not return */
+	panic("md_usermode returned\n");
+	return EINVAL;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//mystery function
+//modifies argv to point to values on the stack
+//returns error on fail, 0 on success
+int move_kernel_to_stack(unsigned long argc, char** argv, vaddr_t *stackPtr){
+
+	int i;
+	unsigned long argWordLength;//length in wordsize of each argument
+	int result = 0;//return val for errors
+
+	//move arguments onto stack
+	for(i = argc -1; i >= 0; i--){
+
+		//move stack ptr
+		argWordLength = how_many_words(argv[i]);
+		*stackPtr -= argWordLength * 4;
+
+		//put the arg on the stack
+		//If last arg is not null, store the actual length found there. we already know it
+		result = copyoutstr(argv[i], (userptr_t)*stackPtr, strlen(argv[i]) + 1, NULL ); //does this add the null terminating character at the end?
+		if (result)	return result;		
+		
+		//we need to move (the pointer of the argument on the stack) onto the stack
+		//because the user program needs pointers to the args.
+		// => track their location to move later
+		argv[i] = (char*)*stackPtr;
+	}
+
+	//double check that the ptrs will be word aligned
+	*stackPtr = *stackPtr - ((*stackPtr) % 4);
+
+	//triple check. should only go off if overflow
+	assert((*stackPtr) % 4 == 0);
+
+	kprintf("attempting to terminate ptrs\n");
+
+	//cant use copy out because it checks if the character == 0(null char) to finish. arnold is 4 bytes of 0
+	//pointers to args are terminated by 4 bytes of nothing
+	vaddr_t* arnoldSchwarzenegger;//comedy gold	
+	*stackPtr-= 4;
+	//stackPtr is actaully an int with location of stack not a ptr to location of stack
+	arnoldSchwarzenegger = (vaddr_t*)*stackPtr;
+	*arnoldSchwarzenegger = 0x0;//terminate.heheheheh
+
+	kprintf("stack is at 0x%x\n", *stackPtr);
+
+	//move the pointers onto the stack
+	for(i = argc - 1; i >= 0; i --)
+	{
+		kprintf("adding ptr\n");
+		*stackPtr = *stackPtr - 4;	
+		result = copyout(&argv[i], (userptr_t)(*stackPtr), sizeof(vaddr_t) );
+		if (result){
+			kprintf("copy out error\n");
+			return result;	
+		} 
+	}
+	return 0;
+}
+
+//returns word size of argument
+//doesn't error hopefully....
+int how_many_words(char* arg){
+
+	//arg <= 1 word ex. char
+	if((strlen(arg) + TER_CHAR_SIZE) <= WORD_SIZE){
+		return(1);
+	}
+	
+	//arg is multiple of word size. ex int or string
+	else if((strlen(arg) + TER_CHAR_SIZE) % WORD_SIZE == 0){
+		return( (strlen(arg) + TER_CHAR_SIZE) / WORD_SIZE );
+	}
+
+	//arg is bigger than n words but smaller than n+1 words. ex string => round up to n words
+	else{
+		return( ((strlen(arg) + TER_CHAR_SIZE) / WORD_SIZE) + 1 );
+	}	
+}

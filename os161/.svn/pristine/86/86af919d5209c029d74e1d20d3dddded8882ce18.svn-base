@@ -1,0 +1,50 @@
+
+#include <coremap.h>
+#include <vm.h>
+#include <types.h>
+#include <lib.h>
+
+struct coremapObject* coremap;
+
+u_int32_t totalCoremapEntries;
+u_int32_t coremapEntriesFree;
+
+
+void
+init_coremap(){
+	
+	paddr_t firstAddr;
+	paddr_t lastAddr;
+
+	// get the first and last address of RAM
+	ram_getsize(&firstAddr, &lastAddr);
+
+	// number of physical page frames is the range of the addresses divided by the page size 
+	int numPFrames = (lastAddr - firstAddr)/PAGE_SIZE ;
+
+	assert(firstAddr != 0);
+	assert(lastAddr != 0);
+
+	// now need the actual size in memory of the core map
+	u_int32_t coremapMemSize;
+	coremapMemSize = numPFrames *(sizeof(struct coremapObject));
+	coremapMemSize = ROUNDUP(numPFrames, PAGE_SIZE);
+
+	// time to steal ram for the coremap itself
+	coremap = (struct coremapObject*) PADDR_TO_KVADDR(firstAddr);
+	firstAddr += coremapMemSize;
+
+	// loop to set the actual values in all the entries
+	int i;
+	for(i = 0; i < numPFrames; i++){
+		
+		coremap[i].used = 0;
+		coremap[i].modified = 0;
+		coremap[i].as = NULL;
+		coremap[i].vaddr = 0;
+		coremap[i].paddr = 0;
+
+	}
+
+
+}

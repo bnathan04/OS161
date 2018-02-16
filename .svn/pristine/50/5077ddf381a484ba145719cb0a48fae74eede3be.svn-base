@@ -1,0 +1,24 @@
+//coremap.h
+#ifndef _COREMAP_H_
+#define _COREMAP_H_
+
+//A coremap keeps track of which pages are in use and also keeps track of which address spaces a page is mapped into. 
+//http://www.eecg.toronto.edu/~lie/Courses/ECE344/asst3.shtml old assignment handout
+
+//test commetn	
+
+typedef struct CoremapObject {
+	unsigned int ppn;//key = physical page number. should be rendundant because array stores physical page
+	int empty; //0 if empty, 1 else
+	int modified;//1 if mm was written to
+	struct addrspace *as;
+	//type vaddr
+	//type addr space identifier 
+} CoremapObject;
+
+extern u_int32_t totalCoremapEntries;//total number of entries available for the coremap
+extern u_int32_t coremapEntriesFree;
+extern CoremapObject* coremap;
+
+
+#endif

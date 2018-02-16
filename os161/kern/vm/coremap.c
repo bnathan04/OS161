@@ -1,0 +1,319 @@
+
+#include <coremap.h>
+#include <vm.h>
+#include <types.h>
+#include <lib.h>
+#include <clock.h>
+#include <machine/tlb.h>
+
+#include <kern/errno.h>
+
+struct coremapObject* coremap;
+
+u_int32_t totalCoremapEntries;
+u_int32_t coremapEntriesFree;
+u_int32_t firstcoremappage;
+
+u_int32_t allocationTotal;
+int allocationCounter;
+int deallocationCounter;
+
+
+void
+init_coremap(){
+	
+	paddr_t firstAddr;
+	paddr_t lastAddr;
+
+	// get the first and last address of RAM
+	ram_getsize(&firstAddr, &lastAddr);
+
+	// number of physical page frames is the range of the addresses divided by the page size 
+	int numPFrames = (lastAddr - firstAddr)/PAGE_SIZE ;
+
+	assert(firstAddr != 0);
+	assert(lastAddr != 0);
+
+	// now need the actual size in memory of the core map
+	u_int32_t coremapMemSize;
+	coremapMemSize = numPFrames *(sizeof(struct coremapObject));
+	coremapMemSize = ROUNDUP(coremapMemSize, PAGE_SIZE);
+
+	assert((coremapMemSize & PAGE_FRAME) == coremapMemSize);
+
+	// time to steal ram for the coremap itself
+	coremap = (struct coremapObject*) PADDR_TO_KVADDR(firstAddr);
+
+	firstAddr += coremapMemSize;
+
+
+	firstcoremappage = firstAddr / PAGE_SIZE;
+	totalCoremapEntries = (lastAddr / PAGE_SIZE) - firstcoremappage;
+	coremapEntriesFree = totalCoremapEntries;
+
+	// loop to set the actual values in all the entries
+	int i;
+	for(i = 0; i < numPFrames; i++){
+		
+		coremap[i].used = 0;
+		// coremap[i].modified = 0;
+		// coremap[i].as = NULL;
+		coremap[i].length = 0;
+		coremap[i].startAddr = 0;
+		// coremap[i].timestamp = -1;
+		// coremap[i].timestampNano = 0;
+		// coremap[i].timein = -1;
+
+		
+
+		coremap[i].paddr = ((paddr_t)PAGE_SIZE) * (i + firstcoremappage);
+		// coremap[i].vaddr = PADDR_TO_KVADDR(coremap[i].paddr);
+
+
+	}
+
+	allocationTotal = 0;
+	allocationCounter = 0;
+	deallocationCounter = 0;
+
+	// kprintf("this is the first address: %x, this is the first physical addr in the map: %x", firstAddr, coremap[0].paddr);
+
+}
+
+
+
+paddr_t 
+find_pages_in_core_map(unsigned long npages){
+
+	// int pages_needed = npages;
+	// paddr_t startAddr;
+
+	// int i;
+
+	// // loop through core map entries
+	// for (i=0 ; i < (int)totalCoremapEntries ; i++){
+
+	// 	// if the current entry is not used, add this to our "count"
+	// 	if (!(coremap[i].used)){
+	// 		pages_needed --;
+
+	// 		if(pages_needed == 0) {
+	// 			break;
+	// 		}
+	// 	}
+
+	// 	// if the current entry IS used, we need to reset our pages needed
+	// 	else{
+
+	// 		pages_needed = npages;
+	// 	}
+	// }
+
+	// // if the counter gets to our max core map entries
+	// // means we never found a contiguous patch of npages
+	// // return 0 for error
+	// if(i==totalCoremapEntries){
+	// 	return(0);
+	// }
+
+	// // need to get the paddr of the first relevant page
+	// int firstPage = i - npages + 1;
+
+	// startAddr =  coremap[firstPage].paddr;
+
+	// return(startAddr);
+
+	int i;
+	int pageNumber = -1;
+	int pagesNeeded = (int) npages;
+	
+
+	if(npages > coremapEntriesFree){
+		// panic("not enough memory to allocate frames\n");
+		return 0;
+	}   
+    
+    // find npages contiguous pages in coremap
+	else if(coremapEntriesFree >=  npages){
+		
+		// cycle thru core map
+		for(i = 0; i < (int) totalCoremapEntries; i++){
+			
+			// if the current entry is used, continue to next one
+			// also need to reset our pages needed counter
+			if(coremap[i].used)	{
+				pageNumber = -1;
+				pagesNeeded = npages;
+				continue;	
+			}
+			
+			// if pagesNeeded = npages => this is first free page we found
+			// => this is the address we need to return
+			if(pagesNeeded == (int) npages){
+				pageNumber = i;
+			}
+
+			//  we found a contiguos pages, so decrement our pagesNeeded counter
+			pagesNeeded--;
+
+			// if we don't need anymore pages, break
+			if(pagesNeeded == 0){
+				break;
+			}
+		}	
+
+		// set the parameters of all our pages
+		for ( i = pageNumber; i < pageNumber + (int) npages; i++){
+
+			coremap[i].startAddr = coremap[pageNumber].paddr;
+			coremap[i].length = npages;
+			coremap[i].used = 1;
+			
+			// gettime(&(coremap[i].timestamp), &(coremap[i].timestampNano));
+
+
+			coremapEntriesFree--;
+
+			allocationTotal += coremap[i].paddr;
+			allocationCounter += 1;
+
+			// coremap[i].timein = allocationCounter;
+			// kprintf("allocated this address: %x\n", coremap[i].paddr);
+			// kprintf("Allocated. New sum = %u. Number allocated so far: %d\n", allocationTotal, allocationCounter);
+
+		}
+
+	 //       /* set paramter of this frame*/
+		// coremap[pageNumber].startAddr = coremap[pageNumber].paddr;
+		// coremap[pageNumber].length = 1;
+		// coremap[pageNumber].used = 1;
+		// coremapEntriesFree--;
+
+	       /* we won't swap out kernel pages*/
+		// if(kernel == 1)
+		// {
+		// 	coremap[pageNumber].isKernel = 1;	
+		// }
+		// else if(kernel == 0)
+		// {
+		// 	coremap[pageNumber].isKernel = 0;	
+		// }
+	
+		// if(flag_print == 1)
+		// {
+		// 	print_coremap();
+		// }
+	
+		return (coremap[pageNumber].paddr);
+	}
+
+
+}
+
+// free an entry in coremap
+void 
+coremap_free(paddr_t addr){
+
+	int i,j;
+
+	// get the page number from the physical address
+	int pageNumber = (addr/PAGE_SIZE) - firstcoremappage;
+
+	// create a dummy pointer that will help to wipe the actual data from memory
+	char* cleaner; /*= (char*)PADDR_TO_KVADDR(addr);*/
+
+	// make sure our page number is valid
+	assert(pageNumber < (int)totalCoremapEntries);
+
+	// find out how many pages need to be freed
+	int freeLength = coremap[pageNumber].length;
+
+	for ( i = pageNumber; i < pageNumber + freeLength; i++){
+
+
+		assert(coremap[i].startAddr == coremap[pageNumber].startAddr);
+		
+		allocationTotal -= coremap[i].paddr;
+
+		deallocationCounter += 1;
+
+		// kprintf("Deallocated. New sum = %u. Number deallocated so far: %d\n", allocationTotal, deallocationCounter);
+		// kprintf("deallocated this address: %x\n", coremap[i].paddr);	
+
+		coremap[pageNumber].used = 0;
+		// coremap[pageNumber].modified = 0;
+		// coremap[pageNumber].as = NULL;
+		coremap[pageNumber].length = 0;
+		// coremap[pageNumber].paddr = 0;
+		// coremap[pageNumber].vaddr = 0;
+		coremap[pageNumber].startAddr = 0;
+		// coremap[pageNumber].timestamp = -1;
+		// coremap[pageNumber].timestampNano = 0;
+
+		coremapEntriesFree++;
+	
+
+	}
+
+
+	// if (coremap[pageNumber].length == 1){
+
+	// 	// make sure that the page number is at the start of a contiguous chunk of memory
+	// 	assert(pageNumber == coremap[pageNumber].startAddr);
+
+	// kprintf("deallocated this address: %x\n", coremap[i].paddr);	
+
+	// 	coremap[pageNumber].used = 0;
+	// 	coremap[pageNumber].modified = 0;
+	// 	coremap[pageNumber].as = NULL;
+	// 	coremap[pageNumber].length = 0;
+	// 	coremap[pageNumber].paddr = 0;
+	// 	coremap[pageNumber].vaddr = 0;
+	// 	coremap[pageNumber].startAddr = 0;
+
+	// 	coremapEntriesFree++;
+
+	// 	// wipe the actual mem content
+	// 	for (i = 0; i < PAGE_SIZE ; i++ ){
+	// 		cleaner[i] = 0;
+	// 	}
+	// }
+
+}
+
+// free a spot in coremap if it is full
+
+// paddr_t
+// evict_coremap_entry(){
+	
+// 	// use FIFO logic
+// 	int i;
+
+// 	int earliest = -1;
+
+// 	int entry = -1;
+
+// 	int curtime;
+
+// 	// cycle through and find the "first-in" coremap entry
+// 	for(i = 0; i < (int)totalCoremapEntries; i++){
+
+// 		curtime = coremap[i].timein;
+
+// 		if(curtime != -1){
+
+// 			if(earliest > curtime || earliest == -1){
+
+// 				earliest = curtime;
+// 				entry = i;
+// 			}
+
+// 		}
+
+// 	}
+
+// 	coremap_free(coremap[entry].paddr);
+
+// 	return (coremap[entry].paddr);
+
+// }

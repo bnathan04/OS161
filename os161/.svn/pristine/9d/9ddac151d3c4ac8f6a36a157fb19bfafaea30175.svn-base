@@ -1,0 +1,43 @@
+//pagetable.c
+
+#include <pagetable.h>
+#include <types.h>
+#include <vm.h>
+#include <coremap.h>
+#include <lib.h>
+
+// //create a page table for a process
+// pagetable init_page_table(){
+	
+// 	// struct array* pt = array_create(); 
+// 	// if(pt == 0x0) panic("dooooooom. no mem for page table");
+	
+// 	// return(pt);
+
+
+
+// }
+
+page* page_create(int num, unsigned int faultaddr, int npages, struct page* prev){
+
+	// alloc the page and set its elements
+	page* newpage = kmalloc(sizeof(struct page));
+	newpage->vaddr = faultaddr;
+	newpage->vpagenum = num;
+	newpage->paddr = getppages(npages);
+	newpage->ppagenum = PADDR_TO_COREMAP(newpage->paddr);
+	newpage->next = kmalloc(sizeof(struct page));
+
+	// ensure linked list functionality - set the next pointer of previous page to new page
+	prev->next = newpage;
+
+	// return
+	return (newpage);
+}
+
+page* page_destroy(){
+
+	/* TO BE IMPLEMENTED*/
+	return(NULL);
+
+}

@@ -1,0 +1,103 @@
+//pagetable.c
+
+#include <pagetable.h>
+#include <types.h>
+#include <vm.h>
+#include <coremap.h>
+#include <lib.h>
+#include <thread.h>
+#include <curthread.h>
+
+
+// create a single page in page table 
+page* 
+page_create(unsigned int faultaddr, int npages){
+
+	// get some necessary details from the page table
+	pagetable table = curthread->t_vmspace->as_pagetable;
+
+	int num;
+	int i = 0;
+
+	// get the correct index for new page
+	while(1){
+		if(table[i].next == NULL){
+			num = i+1;
+			break;
+		}
+		else{
+			i++;
+		}
+	}
+
+
+	// alloc the page
+	// alloc the page and set its elements
+	page* newpage = kmalloc(sizeof(struct page));
+
+	// if (newpage == NULL){
+	// 	panic
+	// }
+
+	newpage->vaddr = faultaddr;
+	newpage->vpagenum = num;
+	newpage->paddr = getppages(npages);
+	newpage->ppagenum = PADDR_TO_COREMAP(newpage->paddr);
+
+	// ensure linked list functionality - set the next pointer of previous page to new page
+	table[num-1].next = newpage;
+
+	// return
+	return (newpage);
+}
+
+// page* 
+// find_page(vaddr_t vaddr, pagetable table){
+
+// 	int i = 0;
+
+// 	assert(vaddr!=0);
+// 	assert(tab)
+
+// 	while (table[i].vaddr != vaddr){
+// 		i++
+// 		()
+// 	}
+
+
+// }
+// destroy a single page in page table
+void 
+page_destroy(page* victim, page* prev){
+	/* TO BE IMPLEMENTED*/
+
+	// break the victim out of the linked list
+	prev->next = victim->next;
+	victim->next = NULL;
+
+	victim->vaddr = 0;
+	victim->vpagenum = 0;
+	victim->paddr = 0;
+	victim->ppagenum = 0;
+
+	kfree(victim);
+	victim = NULL;
+
+}
+
+
+
+int 
+page_in_pagetable(unsigned int vaddr){
+
+	vaddr &= PAGE_SIZE;//page align
+	pagetable pt = (curthread->t_vmspace)->as_pagetable;
+
+	while(pt != NULL){
+		if(pt->vaddr == vaddr){
+			return(1);
+		}
+		pt = pt->next;
+	}
+	return(0);
+}

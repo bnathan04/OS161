@@ -1,0 +1,327 @@
+Checking out repo for os-078
+~/ece344/marker ~/ece344/marker
+A    kern/vm
+A    kern/vm/vm.c
+A    kern/vm/addrspace.c
+A    kern/arch
+A    kern/arch/mips
+A    kern/arch/mips/mips
+A    kern/arch/mips/mips/syscall.c
+A    kern/arch/mips/mips/trap.c
+A    kern/arch/mips/mips/cache_mips1.S
+A    kern/arch/mips/mips/dumbvm.c
+A    kern/arch/mips/mips/exception.S
+A    kern/arch/mips/mips/interrupt.c
+A    kern/arch/mips/mips/lamebus_mips.c
+A    kern/arch/mips/mips/pcb.c
+A    kern/arch/mips/mips/ram.c
+A    kern/arch/mips/mips/spl.c
+A    kern/arch/mips/mips/start.S
+A    kern/arch/mips/mips/switch.S
+A    kern/arch/mips/mips/threadstart.S
+A    kern/arch/mips/mips/tlb_mips1.S
+A    kern/arch/mips/include
+A    kern/arch/mips/include/setjmp.h
+A    kern/arch/mips/include/trapframe.h
+A    kern/arch/mips/include/asmdefs.h
+A    kern/arch/mips/include/bus.h
+A    kern/arch/mips/include/ktypes.h
+A    kern/arch/mips/include/pcb.h
+A    kern/arch/mips/include/specialreg.h
+A    kern/arch/mips/include/spl.h
+A    kern/arch/mips/include/switchframe.h
+A    kern/arch/mips/include/tlb.h
+A    kern/arch/mips/include/types.h
+A    kern/arch/mips/include/vm.h
+A    kern/arch/mips/conf
+A    kern/arch/mips/conf/Makefile.mips
+A    kern/arch/mips/conf/conf.arch
+A    kern/arch/mips/conf/ldscript
+A    kern/conf
+A    kern/conf/conf.kern
+A    kern/conf/ASST0
+A    kern/conf/ASST1
+A    kern/conf/ASST2
+A    kern/conf/ASST2-OPT
+A    kern/conf/ASST3
+A    kern/conf/ASST4
+A    kern/conf/ASST5
+A    kern/conf/config
+A    kern/conf/newvers.sh
+A    kern/include
+A    kern/include/addrspace.h
+A    kern/include/kern
+A    kern/include/kern/syscall_func.h
+A    kern/include/kern/callno.h
+A    kern/include/kern/errmsg.h
+A    kern/include/kern/errno.h
+A    kern/include/kern/ioctl.h
+A    kern/include/kern/limits.h
+A    kern/include/kern/sfs.h
+A    kern/include/kern/stat.h
+A    kern/include/kern/types.h
+A    kern/include/kern/unistd.h
+A    kern/include/vm.h
+A    kern/include/process.h
+A    kern/include/thread.h
+A    kern/include/test.h
+A    kern/include/syscall.h
+A    kern/include/synch.h
+A    kern/include/hello.h
+A    kern/include/array.h
+A    kern/include/bitmap.h
+A    kern/include/clock.h
+A    kern/include/curthread.h
+A    kern/include/dev.h
+A    kern/include/elf.h
+A    kern/include/emufs.h
+A    kern/include/fs.h
+A    kern/include/lib.h
+A    kern/include/queue.h
+A    kern/include/scheduler.h
+A    kern/include/sfs.h
+A    kern/include/stdarg.h
+A    kern/include/types.h
+A    kern/include/uio.h
+A    kern/include/version.h
+A    kern/include/vfs.h
+A    kern/include/vnode.h
+A    kern/syscall
+A    kern/syscall/syscall_func.c
+A    kern/userprog
+A    kern/userprog/process.c
+A    kern/userprog/runprogram.c
+A    kern/userprog/loadelf.c
+A    kern/userprog/uio.c
+A    kern/main
+A    kern/main/menu.c
+A    kern/main/main.c
+A    kern/main/hello.c
+A    kern/lib
+A    kern/lib/copyinout.c
+A    kern/lib/array.c
+A    kern/lib/bitmap.c
+A    kern/lib/kgets.c
+A    kern/lib/kheap.c
+A    kern/lib/kprintf.c
+A    kern/lib/misc.c
+A    kern/lib/ntoh.c
+A    kern/lib/queue.c
+A    kern/thread
+A    kern/thread/thread.c
+A    kern/thread/synch.c
+A    kern/thread/scheduler.c
+A    kern/thread/hardclock.c
+A    kern/asst1
+A    kern/asst1/stoplight.c
+A    kern/asst1/catsem.c
+A    kern/asst1/catlock.c
+A    kern/compile
+A    kern/compile/.svnignore
+A    kern/Makefile
+A    kern/dev
+A    kern/dev/generic
+A    kern/dev/generic/beep.c
+A    kern/dev/generic/beep.h
+A    kern/dev/generic/console.c
+A    kern/dev/generic/console.h
+A    kern/dev/generic/pseudorand.c
+A    kern/dev/generic/pseudorand.h
+A    kern/dev/generic/pseudorand_att.c
+A    kern/dev/generic/random.c
+A    kern/dev/generic/random.h
+A    kern/dev/generic/rtclock.c
+A    kern/dev/generic/rtclock.h
+A    kern/dev/init.c
+A    kern/dev/lamebus
+A    kern/dev/lamebus/beep_ltimer.c
+A    kern/dev/lamebus/con_lscreen.c
+A    kern/dev/lamebus/con_lser.c
+A    kern/dev/lamebus/conf.lamebus
+A    kern/dev/lamebus/emu.c
+A    kern/dev/lamebus/emu.h
+A    kern/dev/lamebus/emu_att.c
+A    kern/dev/lamebus/lamebus.c
+A    kern/dev/lamebus/lamebus.h
+A    kern/dev/lamebus/lhd.c
+A    kern/dev/lamebus/lhd.h
+A    kern/dev/lamebus/lhd_att.c
+A    kern/dev/lamebus/lnet.c
+A    kern/dev/lamebus/lnet_att.c
+A    kern/dev/lamebus/lrandom.c
+A    kern/dev/lamebus/lrandom.h
+A    kern/dev/lamebus/lrandom_att.c
+A    kern/dev/lamebus/lscreen.c
+A    kern/dev/lamebus/lscreen.h
+A    kern/dev/lamebus/lscreen_att.c
+A    kern/dev/lamebus/lser.c
+A    kern/dev/lamebus/lser.h
+A    kern/dev/lamebus/lser_att.c
+A    kern/dev/lamebus/ltimer.c
+A    kern/dev/lamebus/ltimer.h
+A    kern/dev/lamebus/ltimer_att.c
+A    kern/dev/lamebus/ltrace.c
+A    kern/dev/lamebus/ltrace.h
+A    kern/dev/lamebus/ltrace_att.c
+A    kern/dev/lamebus/random_lrandom.c
+A    kern/dev/lamebus/rtclock_ltimer.c
+A    kern/fs
+A    kern/fs/sfs
+A    kern/fs/sfs/sfs_fs.c
+A    kern/fs/sfs/sfs_io.c
+A    kern/fs/sfs/sfs_vnode.c
+A    kern/fs/vfs
+A    kern/fs/vfs/device.c
+A    kern/fs/vfs/devnull.c
+A    kern/fs/vfs/vfscwd.c
+A    kern/fs/vfs/vfslist.c
+A    kern/fs/vfs/vfslookup.c
+A    kern/fs/vfs/vfspath.c
+A    kern/fs/vfs/vnode.c
+A    kern/test
+A    kern/test/arraytest.c
+A    kern/test/bitmaptest.c
+A    kern/test/fstest.c
+A    kern/test/malloctest.c
+A    kern/test/nettest.c
+A    kern/test/queuetest.c
+A    kern/test/synchtest.c
+A    kern/test/threadtest.c
+A    kern/test/tt3.c
+Checked out revision 84.
+Checking for ranlib... yes
+Checking for <err.h>... yes
+Generating defs.mk.
+Installing kernel includes...
+Installing callno.h
+Installing errmsg.h
+Installing errno.h
+Installing ioctl.h
+Installing limits.h
+Installing sfs.h
+Installing stat.h
+Installing syscall_func.h
+Installing types.h
+Installing unistd.h
+Installing machine-dependent includes for mips...
+Installing asmdefs.h
+Installing setjmp.h
+Installing types.h
+Installing library includes...
+Installing assert.h
+Installing err.h
+Installing errno.h
+Installing fcntl.h
+Installing limits.h
+Installing setjmp.h
+Installing stdarg.h
+Installing stdio.h
+Installing stdlib.h
+Installing string.h
+Installing time.h
+Installing unistd.h
+Installing sys/ioctl.h
+Installing sys/reboot.h
+Installing sys/stat.h
+Installing sys/types.h
+Installing sys/wait.h
+a - __printf.o
+a - snprintf.o
+a - printf.o
+a - atoi.o
+a - bzero.o
+a - memcmp.o
+a - memcpy.o
+a - memmove.o
+a - memset.o
+a - malloc.o
+a - strcat.o
+a - strchr.o
+a - strcmp.o
+a - strcpy.o
+a - strlen.o
+a - strrchr.o
+a - strtok.o
+a - strtok_r.o
+a - __assert.o
+a - __puts.o
+a - err.o
+a - getchar.o
+a - putchar.o
+a - puts.o
+a - abort.o
+a - errno.o
+a - exit.o
+a - getcwd.o
+a - random.o
+a - strerror.o
+a - system.o
+a - time.o
+a - mips-setjmp.o
+a - syscalls.o
+ar: `u' modifier ignored since `D' is the default (see `U')
+a - err.ho
+a - time.ho
+a - hostcompat.ho
+~/ece344/marker/os-078/os161-1.11-testpatch/kern/conf ~/ece344/marker/os-078/os161-1.11-testpatch ~/ece344/marker
+Configuration ASST2
+Generating files... opt-*.h files.mk defs.mk Makefile autoconf.h autoconf.c
+Configuration in ../compile/ASST2 done
+Remember to make depend
+~/ece344/marker/os-078/os161-1.11-testpatch ~/ece344/marker
+../../arch/mips/mips/dumbvm.c:30: warning: static declaration for `getppages' follows non-static
+../../arch/mips/mips/syscall.c: In function `mips_syscall':
+../../arch/mips/mips/syscall.c:121: warning: passing arg 1 of `sys_time' makes pointer from integer without a cast
+../../arch/mips/mips/syscall.c:121: warning: passing arg 2 of `sys_time' makes pointer from integer without a cast
+../../thread/synch.c: In function `lock_destroy':
+../../thread/synch.c:151: warning: passing arg 1 of `kfree' discards qualifiers from pointer target type
+../../thread/synch.c: In function `cv_create':
+../../thread/synch.c:267: warning: passing arg 1 of `q_preallocate' discards qualifiers from pointer target type
+../../thread/synch.c: In function `cv_destroy':
+../../thread/synch.c:279: warning: passing arg 1 of `q_empty' discards qualifiers from pointer target type
+../../thread/synch.c:286: warning: passing arg 1 of `q_destroy' discards qualifiers from pointer target type
+../../thread/synch.c: In function `cv_wait':
+../../thread/synch.c:316: warning: passing arg 1 of `q_addtail' discards qualifiers from pointer target type
+../../thread/synch.c: In function `cv_signal':
+../../thread/synch.c:341: warning: passing arg 1 of `q_empty' discards qualifiers from pointer target type
+../../thread/synch.c:341: warning: passing arg 1 of `q_remhead' discards qualifiers from pointer target type
+../../thread/synch.c: In function `cv_broadcast':
+../../thread/synch.c:359: warning: passing arg 1 of `q_empty' discards qualifiers from pointer target type
+../../userprog/runprogram.c: In function `runprogram':
+../../userprog/runprogram.c:125: warning: assignment makes pointer from integer without a cast
+../../userprog/runprogram.c:132: warning: passing arg 2 of `copyout' makes pointer from integer without a cast
+../../userprog/runprogram.c:139: warning: passing arg 2 of `md_usermode' makes pointer from integer without a cast
+../../userprog/runprogram.c:31: warning: unused parameter `kernelCall'
+../../syscall/syscall_func.c: In function `sys_execv':
+../../syscall/syscall_func.c:374: warning: passing arg 2 of `copyinstr' from incompatible pointer type
+../../syscall/syscall_func.c:402: warning: passing arg 2 of `copyinstr' from incompatible pointer type
+../../syscall/syscall_func.c:463: warning: control reaches end of non-void function
+../../syscall/syscall_func.c: In function `sys_time':
+../../syscall/syscall_func.c:483: warning: implicit declaration of function `gettime'
+../../syscall/syscall_func.c:489: warning: passing arg 2 of `copyout' from incompatible pointer type
+../../syscall/syscall_func.c:502: warning: passing arg 2 of `copyout' from incompatible pointer type
+../../userprog/process.c:26:2: warning: no newline at end of file
+../../vm/vm.c:33: warning: static declaration for `getppages' follows non-static
+../../vm/vm.c:343:5: warning: no newline at end of file
+*** This is ASST2 build #1 ***
+vm.o(.text+0x0): In function `vm_bootstrap':
+../../vm/vm.c:26: multiple definition of `vm_bootstrap'
+dumbvm.o(.text+0x0):../../arch/mips/mips/dumbvm.c:23: first defined here
+vm.o(.text+0x70): In function `alloc_kpages':
+../../vm/vm.c:48: multiple definition of `alloc_kpages'
+dumbvm.o(.text+0x70):../../arch/mips/mips/dumbvm.c:45: first defined here
+vm.o(.text+0xd4): In function `free_kpages':
+../../vm/vm.c:59: multiple definition of `free_kpages'
+dumbvm.o(.text+0xd4):../../arch/mips/mips/dumbvm.c:56: first defined here
+vm.o(.text+0xf4): In function `vm_fault':
+../../vm/vm.c:67: multiple definition of `vm_fault'
+dumbvm.o(.text+0xf4):../../arch/mips/mips/dumbvm.c:64: first defined here
+vm.o(.text+0x8a4): In function `as_prepare_load':
+../../vm/vm.c:161: multiple definition of `as_prepare_load'
+dumbvm.o(.text+0xb3c):../../arch/mips/mips/dumbvm.c:238: first defined here
+Makefile:118: recipe for target 'kernel' failed
+make: *** [kernel] Error 1
+os161-tester: The os161 kernel executable does not exist in this directory. Run this script from the OS161 root directory.
+os161.log not found
+os161-mark.txt not found
+~/ece344/marker

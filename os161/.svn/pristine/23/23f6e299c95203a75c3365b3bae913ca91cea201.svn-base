@@ -1,0 +1,16 @@
+//pagetable.c
+
+#include <pagetable.h>
+
+
+// //create a page table for a process
+// pagetable init_page_table(){
+	
+// 	// struct array* pt = array_create(); 
+// 	// if(pt == 0x0) panic("dooooooom. no mem for page table");
+	
+// 	// return(pt);
+
+	
+
+// }

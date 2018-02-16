@@ -1,0 +1,44 @@
+#ifndef _PAGETABLE_H_
+#define _PAGETABLE_H_
+//pagetable.h
+
+// #include <array.h>
+
+// #include <../arch/mips/include/ktypes.h>
+
+//page tables map virtual addresses(addresses that cpu thinks it's addressing)
+//to locations in main memory if they exist
+
+typedef struct page{
+
+	// physical and virtual page numbers
+	int ppagenum;
+	int vpagenum; /* UNSURE IF VPAGE NUM IS NECESSARY*/
+
+	// physical and virtual address bases
+	unsigned int vaddr;
+	unsigned int paddr;
+
+	/* UNSURE IF PERMISSIONS NEED TO BE TRACKED*/
+	// int read;
+	// int write;
+	// int exec;
+
+	// pointer to next element
+	struct page* next;
+
+} page;
+
+typedef struct page* pagetable;
+
+page* page_create(int num, unsigned int faultaddr, int npages, struct page* prev);
+page* page_destroy();
+
+
+
+// typedef struct+ array page_table;
+
+// page_table* init_page_table();
+
+
+#endif /* _PAGETABLE_H_ */
